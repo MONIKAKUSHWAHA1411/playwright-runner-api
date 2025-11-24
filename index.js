@@ -7,16 +7,20 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: "10mb" }));
 
+// POST /run-test
 app.post("/run-test", async (req, res) => {
   try {
     const { code } = req.body;
 
-    if (!code) return res.status(400).json({ error: "Missing script" });
+    if (!code) {
+      return res.status(400).json({ error: "Missing script" });
+    }
 
     let logs = [];
     let errors = [];
 
-    const fn = new Function("chromium", "logs", "errors", `
+    // Support require() inside user code
+    const fn = new Function("chromium", "logs", "errors", "require", `
       return (async () => {
         try {
           ${code}
@@ -27,10 +31,10 @@ app.post("/run-test", async (req, res) => {
       })();
     `);
 
-    const result = await fn(chromium, logs, errors);
+    const result = await fn(chromium, logs, errors, require);
 
     res.json({
-      success: true,
+      success: errors.length === 0,
       logs: result.logs,
       errors: result.errors
     });
@@ -40,8 +44,13 @@ app.post("/run-test", async (req, res) => {
   }
 });
 
+// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "healthy", version: "1.0.0" });
 });
 
-app.listen(8000, () => console.log("Playwright Runner running on port 8000"));
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Playwright Runner API listening on port ${PORT}`);
+});
