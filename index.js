@@ -7,50 +7,41 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: "10mb" }));
 
-// POST /run-test
 app.post("/run-test", async (req, res) => {
-  try {
-    const { code } = req.body;
+    try {
+        const { code } = req.body;
+        if (!code) return res.status(400).json({ error: "Missing script" });
 
-    if (!code) {
-      return res.status(400).json({ error: "Missing script" });
-    }
+        let logs = [];
+        let errors = [];
 
-    let logs = [];
-    let errors = [];
-
-    // Support require() inside user code
-    const fn = new Function("chromium", "logs", "errors", "require", `
-      return (async () => {
+        // Wrap code in a safe testFn
+        let testFn;
         try {
-          ${code}
+            testFn = eval(code);    // code contains "async function test(...) {}; return test;"
         } catch (err) {
-          errors.push(err.toString());
+            return res.status(400).json({ error: "Bad code", details: err.toString() });
         }
-        return { logs, errors };
-      })();
-    `);
 
-    const result = await fn(chromium, logs, errors, require);
+        try {
+            await testFn({ chromium, logs });
+        } catch (err) {
+            errors.push(err.stack || err.toString());
+        }
 
-    res.json({
-      success: errors.length === 0,
-      logs: result.logs,
-      errors: result.errors
-    });
+        return res.json({
+            success: errors.length === 0,
+            logs,
+            errors,
+        });
 
-  } catch (err) {
-    res.status(500).json({ error: err.toString() });
-  }
+    } catch (err) {
+        return res.status(500).json({ error: err.stack || err.toString() });
+    }
 });
 
-// Health check
 app.get("/health", (req, res) => {
-  res.json({ status: "healthy", version: "1.0.0" });
+    res.json({ status: "healthy", version: "1.0.0" });
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Playwright Runner API listening on port ${PORT}`);
-});
+app.listen(3000, () => console.log("Runner API listening on 3000"));
