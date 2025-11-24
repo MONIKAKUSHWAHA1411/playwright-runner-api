@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: playwright-runner
+    env: node
+    region: frankfurt
+    plan: starter
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    autoDeploy: true
+    envVars: []
