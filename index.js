@@ -15,10 +15,14 @@ app.post("/run-test", async (req, res) => {
         let logs = [];
         let errors = [];
 
-        // Wrap code in a safe testFn
+        // Wrap code in an IIFE for safe return of the function
         let testFn;
         try {
-            testFn = eval(code);    // code contains "async function test(...) {}; return test;"
+            // Wrap the provided code, transform it into a returned function
+            testFn = eval(`(() => { ${code} })()`);
+            if (typeof testFn !== "function") {
+                throw new Error("Provided code did not return a function");
+            }
         } catch (err) {
             return res.status(400).json({ error: "Bad code", details: err.toString() });
         }
